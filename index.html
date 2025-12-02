@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>梨梨的口袋厨房 v39.0 · 完美区分版</title>
+    <style>
+        :root {
+            --k-bg: #fffbf0;
+            --bg-color: #fffdf5;
+            
+            /* 冰箱配色 */
+            --fridge-door: #ffc0cb; 
+            --fridge-body: #ffffff;
+            --cat-ear-inner: #ff9eb5;
+            
+            /* 内部配色 */
+            --glass-edge: rgba(220, 235, 255, 0.6);
+            --drawer-edge: #e0e0e0;
+            
+            /* 按钮颜色 */
+            --btn-primary: #FFB74D;
+            --btn-primary-shadow: #E67E22;
+            --btn-white: #ffffff;
+            --btn-white-shadow: #dcdcdc;
+            
+            /* 状态色 */
+            --color-fresh: #00b894; --color-good: #0984e3; --color-notice: #fdcb6e; --color-warn: #e17055; --color-bad: #d63031;    
+            --ball-happy: #74b9ff; --ball-sad: #ff7675;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            margin: 0; padding: 0; 
+            background-color: #1a1a1a; 
+            font-family: "Varela Round", "Microsoft YaHei", sans-serif;
+            color: #5D5D5D; 
+            height: 100vh; width: 100vw; 
+            overflow: hidden; 
+            position: fixed; 
+            user-select: none;
+        }
+
+        /* ==================== 1. 厨房场景 ==================== */
+        #view-kitchen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10;
+            transform-origin: 20% 60%; 
+            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55), opacity 0.8s;
+        }
+        .bg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; transition: opacity 0.8s ease-in-out; }
+        .bg-on { background-image: url('https://i.ibb.co/LbXYjmV/IMG-4262.jpg'); z-index: 1; opacity: 1; }
+        .bg-off { background-image: url('https://i.ibb.co/m5CMNbss/IMG-4257.jpg'); z-index: 2; opacity: 0; pointer-events: none; }
+        body.lights-out .bg-off { opacity: 1; } body.lights-out .bg-on { opacity: 0; }
+        
+        .light-switch { position: absolute; top: 0; right: 15%; z-index: 100; cursor: pointer; display: flex; flex-direction: column; align-items: center; transition: transform 0.2s; }
+        .light-switch:active { transform: translateY(15px); }
+        .switch-line { width: 2px; height: 120px; background: rgba(255,255,255,0.8); }
+        .switch-img-box { width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2px solid #fff; background: #fff; }
+        .switch-img-box img { width: 100%; height: 100%; object-fit: cover; }
+        body.lights-out .switch-img-box { filter: brightness(0.5); }
+
+        .click-zone { position: absolute; z-index: 15; cursor: pointer; background: transparent; }
+        .click-zone:active { background: rgba(255,255,255,0.05); }
+        .zone-fridge { top: 20%; left: 2%; width: 38%; height: 75%; }
+        .zone-snacks { top: 5%; right: 0; width: 55%; height: 50%; }
+        .zone-sink { bottom: 0; right: 0; width: 55%; height: 40%; }
+
+
+        /* ==================== 2. 冰箱应用层 ==================== */
+        #view-fridge-app {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 20; background: var(--bg-color);
+            display: flex; flex-direction: column; align-items: center;
+            opacity: 0; visibility: hidden;
+            transform: scale(0.8);
+            padding-top: 60px; 
+            transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55), opacity 0.8s, visibility 0s 0.8s;
+        }
+
+        body.mode-fridge #view-kitchen { transform: scale(4); opacity: 0; visibility: hidden; transition: transform 0.8s, opacity 0.8s, visibility 0s 0.8s; }
+        body.mode-fridge #view-fridge-app { opacity: 1; visibility: visible; transform: scale(1); transition: transform 0.8s, opacity 0.8s, visibility 0s; }
+
+        /* --- 猫耳朵 --- */
+        .fridge-ears-container { 
+            position: absolute; top: 25px; width: 85vw; height: 50px; 
+            z-index: 999; /* 确保最高 */
+            display: flex; justify-content: space-between; padding: 0 30px; 
+            pointer-events: none; 
+        }
+        .static-ear { 
+            width: 0; height: 0; 
+            border-left: 25px solid transparent; 
+            border-right: 25px solid transparent; 
+            border-bottom: 55px solid var(--fridge-door); 
+            position: relative; 
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+        }
+        .static-ear::before { content: ''; position: absolute; top: 4px; left: -21px; width: 0; height: 0; border-left: 21px solid transparent; border-right: 21px solid transparent; border-bottom: 42px solid #fff; z-index: 1; }
+        .static-ear::after { content: ''; position: absolute; top: 16px; left: -12px; width: 0; height: 0; border-left: 12px solid transparent; border-right: 12px solid transparent; border-bottom: 24px solid var(--cat-ear-inner); z-index: 2; }
+        .ear-left { transform: rotate(-10deg); } 
+        .ear-right { transform: rotate(10deg); }
+
+        /* --- 冰箱主体 --- */
+        .fridge-wrapper { 
+            position: relative; width: 90vw; height: 75vh; z-index: 10; 
+            flex-shrink: 0; 
+        }
+        .fridge-viewport { 
+            width: 100%; height: 100%; 
+            background: var(--fridge-body); 
+            border-radius: 40px; border: 8px solid #fff; 
+            box-shadow: 0 20px 60px rgba(243, 166, 178, 0.3); 
+            position: relative; overflow: hidden; z-index: 10; 
+        }
+        
+        .door-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; display: flex; perspective: 1500px; pointer-events: none; }
+        .door-panel { width: 50%; height: 100%; background: var(--fridge-door); border: 4px solid #fff; position: relative; transition: transform 0.8s ease-in-out; pointer-events: auto; cursor: pointer; display: flex; align-items: center; }
+        .door-l { border-radius: 32px 0 0 32px; border-right: 2px solid #fff; transform-origin: left center; justify-content: flex-end; padding-right: 15px; }
+        .door-r { border-radius: 0 32px 32px 0; border-left: 2px solid #fff; transform-origin: right center; justify-content: flex-start; padding-left: 15px; }
+        .handle { width: 12px; height: 80px; background: #fff; border-radius: 12px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
+        .sticker { position: absolute; font-size: 28px; filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.1)); pointer-events: none; }
+        
+        .door-l .sticker:nth-child(2) { top: 15%; right: 40px; transform: rotate(-15deg); }
+        .door-l .sticker:nth-child(3) { top: 30%; right: 30px; transform: rotate(5deg); font-size: 24px;}
+        .door-r .sticker { top: 20%; left: 30px; transform: rotate(10deg); }
+
+        .fridge-viewport.is-open .door-l { transform: rotateY(-110deg); } 
+        .fridge-viewport.is-open .door-r { transform: rotateY(110deg); }
+
+
+        /* --- 3. 底部控制栏 --- */
+        .controls { 
+            position: absolute; bottom: 30px; width: 90%; height: 80px; 
+            display: flex; align-items: center; justify-content: space-between; 
+            z-index: 50; padding: 0 15px; pointer-events: none; 
+        }
+        
+        #status-text { color: #aaa; font-size: 13px; font-weight: bold; margin-left: 5px; }
+        
+        .ctrl-right { display: flex; gap: 15px; align-items: center; pointer-events: auto; }
+
+        .btn-close { 
+            border: none; outline: none;
+            background: var(--btn-white); color: #666; 
+            padding: 12px 25px; border-radius: 30px; 
+            font-weight: bold; font-size: 15px;
+            box-shadow: 0 5px 0 var(--btn-white-shadow), 0 10px 15px rgba(0,0,0,0.1); 
+            cursor: pointer; transition: all 0.1s; transform: translateY(0);
+            flex-shrink: 0; 
+        }
+        .btn-close:active { transform: translateY(5px); box-shadow: 0 0 0 var(--btn-white-shadow); }
+
+        .btn-add {
+            width: 64px; height: 64px; 
+            border-radius: 50%; border: none; outline: none;
+            background: var(--btn-primary); color: #fff; font-size: 32px;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 6px 0 var(--btn-primary-shadow), 0 10px 20px rgba(255, 183, 77, 0.4); 
+            cursor: pointer; transition: all 0.1s; transform: translateY(0);
+            flex-shrink: 0; 
+        }
+        .btn-add:active { transform: translateY(6px); box-shadow: 0 0 0 var(--btn-primary-shadow); }
+
+
+        /* ==================== 内部结构 ==================== */
+        .camera-track { width: 300%; height: 100%; display: flex; transform: translateX(-33.333%); transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1); }
+        .view-panel { width: 33.333%; height: 100%; position: relative; padding: 10px; }
+        .panel-content { width: 100%; height: 100%; background: #fff; border: 4px solid #f4f4f4; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .panel-title { font-weight: bold; color: #ddd; margin-bottom: 20px; border-bottom: 2px dashed #eee; width: 100%; text-align: center; padding-bottom: 10px;}
+        
+        .door-shelf { width: 100%; margin-bottom: 15px; background: rgba(248, 250, 252, 0.8); border: 2px solid #fff; border-bottom: 6px solid #e0e6ed; border-radius: 12px 12px 24px 24px; display: flex; align-items: center; justify-content: space-around; position: relative; min-height: 60px; }
+        .door-shelf::before { content: attr(data-label); position: absolute; top: -10px; left: 10px; background: #fff; padding: 0 8px; font-size: 10px; color: #aaa; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+        .egg-shelf { min-height: 80px; background-color: #fffbf0; border-bottom-color: #f0e6cf; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 15px 5px 5px 5px; justify-items: center; align-items: center; background-image: radial-gradient(circle, rgba(0,0,0,0.06) 40%, transparent 41%); background-size: 33% 50%; background-position: center; }
+        .egg-shelf::before { background: #ffeaa7; color: #fff; }
+
+        .fridge-main-bg { width: 100%; height: 100%; display: flex; flex-direction: column; }
+        .fridge-interior { flex: 1; background: #fff; border-radius: 28px; margin: 5px; padding: 15px; display: flex; flex-direction: column; perspective: 800px; box-shadow: inset 0 0 30px rgba(0,0,0,0.02); border: 2px solid #f8f8f8; }
+        .shelf-area { flex: 2; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+        .shelf { flex: 1; background: linear-gradient(to bottom, rgba(255,255,255,0.9), rgba(245,250,255,0.6)); border-bottom: 4px solid var(--glass-edge); border-radius: 6px; display: flex; justify-content: space-around; align-items: center; position: relative; }
+        .shelf-label { position: absolute; top: 2px; left: 5px; font-size: 10px; color:#ccc; }
+        .mid-drawers { height: 18%; display: flex; gap: 10px; margin-bottom: 10px; position: relative; z-index: 20; }
+        .bottom-drawer { height: 20%; margin-bottom: 10px; position: relative; z-index: 19; }
+        .deep-drawer { height: 15%; margin-bottom: 5px; position: relative; z-index: 18; }
+        .drawer-container { flex: 1; position: relative; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .drawer-face { width: 100%; height: 100%; background: #fff; border: 1px solid #fff; border-bottom: 6px solid var(--drawer-edge); border-radius: 16px; box-shadow: 0 5px 10px rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: center; font-size: 13px; color: #aaa; font-weight: bold; position: absolute; top: 0; left: 0; z-index: 20; backface-visibility: hidden; }
+        .drawer-body { width: 96%; height: 90%; background: rgba(255,255,255,0.98); border-radius: 12px; position: absolute; top: 5%; left: 2%; transform: translateZ(-20px); box-shadow: inset 0 5px 15px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: space-around; opacity: 0; transition: opacity 0.3s; z-index: 10; }
+        #drawer-freeze { background: rgba(240, 248, 255, 0.95); } #drawer-deep { background: rgba(240, 240, 245, 0.95); }
+        .drawer-container.is-pulled { transform: translateY(40%) rotateX(-20deg) translateZ(20px); z-index: 100; }
+        .drawer-container.is-pulled .drawer-body { opacity: 1; transform: translateZ(5px) translateY(-10px); }
+        
+        .nav-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; background: #fff; border-radius: 50%; box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; justify-content: center; align-items: center; font-size: 20px; color: #555; cursor: pointer; z-index: 90; border: none; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .arrow-left { left: 10px; } .arrow-right { right: 10px; }
+        .btn-back-center { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: #fff; padding: 10px 25px; border-radius: 25px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); font-weight: bold; color: #555; border: none; z-index: 90; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .view-center .arrow-left, .view-center .arrow-right { opacity: 1; pointer-events: auto; }
+        .view-side .btn-back-center { opacity: 1; pointer-events: auto; }
+
+        /* Food Bubble & Status Colors */
+        .food-bubble { width: 40px; height: 40px; background: #fff; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 22px; position: relative; flex-shrink: 0; transition: transform 0.2s; cursor: pointer; border: 3px solid #eee; }
+        .status-fresh { border-color: var(--color-fresh); box-shadow: 0 3px 8px rgba(0, 184, 148, 0.2); background: #f0fff4; }
+        .status-good { border-color: var(--color-good); box-shadow: 0 3px 8px rgba(9, 132, 227, 0.2); background: #f0f8ff; }
+        .status-notice { border-color: var(--color-notice); box-shadow: 0 3px 8px rgba(253, 203, 110, 0.3); background: #fff9e6; }
+        .status-warn { border-color: var(--color-warn); box-shadow: 0 3px 8px rgba(225, 112, 85, 0.3); background: #fff0e6; }
+        .status-bad { border-color: var(--color-bad); background: #ffe0e0; box-shadow: 0 3px 10px rgba(214, 48, 49, 0.3); animation: badShake 0.5s infinite; }
+        .food-bubble.frozen { background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-color: #74b9ff; box-shadow: 0 0 8px rgba(116, 185, 255, 0.6); animation: none; }
+        .food-bubble.text-mode { font-size: 12px; font-weight: bold; color: #555; overflow: hidden; word-break: break-all; line-height: 1.1; }
+        .status-bad::after { content: '🤢'; position: absolute; top: -12px; right: -8px; font-size: 14px; animation: badSmell 2s infinite ease-out; pointer-events: none; }
+        .status-bad::before { content: '💨'; position: absolute; top: -15px; left: -5px; font-size: 12px; filter: hue-rotate(45deg); opacity: 0.7; animation: badSmell 2.5s infinite ease-out 0.5s; pointer-events: none; }
+        .food-bubble.frozen::after { content: '❄️'; font-size: 12px; top: -5px; right: -5px; animation: none; opacity: 1; filter: drop-shadow(0 0 2px #fff); position: absolute; }
+        .food-bubble.frozen::before { content: none; }
+        .food-bubble.frozen.status-bad::before { content: '💨'; position: absolute; top: -20px; left: 0; font-size: 12px; filter: hue-rotate(45deg); opacity: 0.7; animation: badSmell 2.5s infinite ease-out 0.5s; display: block; }
+        
+        /* --- 核心修改：大咬痕 (Clip-Path) --- */
+        /* 吃了一点 (>50% <90%): 右上角明显缺口 */
+        .food-bubble.bitten-light { 
+            clip-path: polygon(0% 0%, 60% 0%, 55% 25%, 80% 20%, 100% 40%, 100% 100%, 0% 100%); 
+        }
+        /* 快吃完了 (<50%): 剩下左下角一小块 */
+        .food-bubble.bitten-heavy { 
+            clip-path: polygon(0% 0%, 30% 0%, 25% 25%, 60% 45%, 30% 70%, 100% 80%, 100% 100%, 0% 100%); 
+        }
+        /* 详情页同步 */
+        .mw-food-hero.bitten-light { clip-path: polygon(0% 0%, 60% 0%, 55% 25%, 80% 20%, 100% 40%, 100% 100%, 0% 100%); }
+        .mw-food-hero.bitten-heavy { clip-path: polygon(0% 0%, 30% 0%, 25% 25%, 60% 45%, 30% 70%, 100% 80%, 100% 100%, 0% 100%); }
+
+        @keyframes badShake { 0% { transform: translate(1px, 1px); } 50% { transform: translate(-1px, 2px); } 100% { transform: translate(1px, -2px); } }
+        @keyframes badSmell { 0% { opacity: 0; transform: translateY(0) scale(0.5); } 50% { opacity: 1; } 100% { opacity: 0; transform: translateY(-25px) scale(1.2); } }
+
+        /* Suspended Layer */
+        #layer-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 200; pointer-events: none; }
+        .btn-back-home { position: absolute; top: 20px; left: 20px; z-index: 300; background: #fff; border: 2px solid #eee; padding: 8px 15px; border-radius: 20px; font-weight: bold; color: #888; box-shadow: 0 4px 10px rgba(0,0,0,0.05); cursor: pointer; display: flex; align-items: center; gap: 5px; transition: transform 0.2s; pointer-events: auto; }
+        .btn-back-home:active { transform: scale(0.95); }
+        #spiritContainer { opacity: 0; transition: opacity 0.5s; pointer-events: none; }
+        body.mode-fridge #spiritContainer { opacity: 1; pointer-events: auto; }
+        .spirit-ball-wrapper { position: absolute; top: 50px; left: 50%; width: 50px; height: 50px; pointer-events: auto; cursor: move; touch-action: none; will-change: transform; z-index: 200; }
+        .ball-inner { width: 100%; height: 100%; border-radius: 50%; background: var(--ball-happy); box-shadow: 0 5px 20px rgba(116, 185, 255, 0.4), inset -5px -5px 10px rgba(0,0,0,0.1); display: flex; justify-content: center; align-items: center; color: #fff; font-weight: bold; font-size: 13px; white-space: nowrap; user-select: none; transition: background 0.3s, box-shadow 0.3s; animation: float 3s ease-in-out infinite; }
+        .ball-inner::after { content: ''; position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px; border-radius: 50%; border: 2px solid var(--ball-happy); opacity: 0.5; animation: pulse 2s infinite; pointer-events: none; }
+        .spirit-ball-wrapper.dragging .ball-inner { transform: scale(1.1); box-shadow: 0 10px 30px rgba(0,0,0,0.2); opacity: 0.9; animation: none; }
+        .ball-inner.sad { background: var(--ball-sad); box-shadow: 0 5px 20px rgba(255, 118, 117, 0.4), inset -5px -5px 10px rgba(0,0,0,0.2); animation: shake 0.5s infinite; }
+        .ball-inner.sad::after { border-color: var(--ball-sad); animation: none; opacity: 0; }
+        .spirit-ball-wrapper.hidden { display: none; }
+        .ball-inner.poked { animation: poke-bounce 0.3s !important; }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(1.5); opacity: 0; } }
+        @keyframes shake { 0% { transform: translate(0,0); } 25% { transform: translate(-2px, 0); } 75% { transform: translate(2px, 0); } 100% { transform: translate(0,0); } }
+        @keyframes poke-bounce { 0% { transform: scale(1); } 40% { transform: scale(0.8); } 100% { transform: scale(1.1); } }
+        .msg-bubble { position: absolute; top: -45px; left: 50%; transform: translateX(-50%) scale(0); background: #fff; padding: 6px 14px; border-radius: 16px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); font-size: 12px; color: #555; font-weight: bold; white-space: nowrap; transition: transform 0.3s; z-index: 201; pointer-events: none; }
+        .msg-bubble::after { content: ''; position: absolute; bottom: -6px; left: 50%; margin-left: -6px; border-width: 6px 6px 0; border-style: solid; border-color: #fff transparent transparent transparent; }
+        .msg-bubble.show { transform: translateX(-50%) scale(1); }
+
+        .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); background: rgba(0,0,0,0.7); color: #fff; padding: 15px 25px; border-radius: 30px; font-size: 16px; pointer-events: none; z-index: 500; transition: transform 0.3s; }
+        .toast.show { transform: translate(-50%, -50%) scale(1); }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 400; backdrop-filter: blur(2px); pointer-events: auto; }
+        .modal-content { background: #fff; width: 92%; max-height: 85vh; padding: 20px; border-radius: 24px; text-align: center; overflow: hidden; display:flex; flex-direction:column; position: relative; box-shadow: 0 15px 50px rgba(0,0,0,0.15); }
+        .modal-header { padding: 10px 0 15px; border-bottom: 1px solid #f0f0f0; font-size: 18px; font-weight: bold; color: #555; display: flex; align-items: center; justify-content: center; gap: 8px;}
+        .modal-body { padding: 20px 5px; overflow-y: auto; flex: 1; text-align: left; }
+        .modal-footer { padding-top: 15px; border-top: 1px solid #f0f0f0; display: flex; gap: 10px; }
+        .modal-view { display: flex; flex-direction: column; height: 100%; }
+        #view-library { display: none; }
+        .icon-selector-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; background: #fff9f0; padding: 12px; border-radius: 16px; border: 1px solid #ffeaa7; cursor: pointer; transition: transform 0.1s; }
+        .icon-selector-row:active { transform: scale(0.98); }
+        .current-icon-preview { font-size: 32px; width: 50px; height: 50px; background: #fff; border-radius: 12px; display: flex; justify-content: center; align-items: center; box-shadow: 0 3px 8px rgba(0,0,0,0.05); }
+        .select-text { flex: 1; color: #888; font-size: 14px; }
+        .form-group { margin-bottom: 15px; }
+        .form-label { font-size: 12px; color: #999; margin-bottom: 6px; display: block; }
+        .input-box { width: 100%; padding: 12px; border: 1px solid #eee; border-radius: 12px; background: #fcfcfc; font-size: 15px; transition: border 0.2s; }
+        .input-box:focus { border-color: var(--btn-primary); background: #fff; }
+        .emoji-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 5px 0 15px; border-bottom: 1px solid #f5f5f5; }
+        .emoji-tab { padding: 8px 16px; background: #f0f0f0; border-radius: 20px; font-size: 13px; color: #666; cursor: pointer; white-space: nowrap; transition: 0.2s; }
+        .emoji-tab.active { background: var(--btn-primary); color: #fff; font-weight: bold; box-shadow: 0 4px 10px rgba(255, 183, 77, 0.3); }
+        .emoji-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; overflow-y: auto; padding: 15px 5px; flex: 1; }
+        .emoji-item { font-size: 28px; padding: 10px; background: #fafafa; border-radius: 12px; cursor: pointer; text-align: center; }
+        .lib-header-row { display: flex; align-items: center; margin-bottom: 10px; }
+        .btn-back-lib { background: none; border: none; font-size: 24px; color: #555; cursor: pointer; padding: 0 10px; }
+        .btn-main { flex: 1; padding: 14px; border-radius: 16px; font-weight: bold; border: none; font-size: 15px; cursor: pointer; }
+        .btn-eat { background: var(--btn-primary); color: #fff; box-shadow: 0 5px 0 #e67e22; } 
+        .btn-eat:active { transform: translateY(4px); box-shadow: 0 0 0 #e67e22; }
+        .btn-toss { background: #ff7675; color: #fff; box-shadow: 0 5px 0 #d63031; } 
+        .btn-toss:active { transform: translateY(4px); box-shadow: 0 0 0 #d63031; }
+        .btn-cancel { background: #f0f0f0; color: #888; box-shadow: 0 5px 0 #dcdcdc; }
+        .btn-cancel:active { transform: translateY(4px); box-shadow: 0 0 0 #dcdcdc; }
+
+        /* === Micro World (详情页) === */
+        #micro-world { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255,255,255,0.95); 
+            display: none; z-index: 300; flex-direction: column; 
+            transform-origin: center center; transform: scale(0); opacity: 0; 
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s; 
+            backdrop-filter: blur(10px); pointer-events: auto; 
+        }
+        #micro-world.active { transform: scale(1); opacity: 1; }
+        #mw-canvas { position: absolute; width: 100%; height: 100%; pointer-events: none; }
+        .mw-content { z-index: 10; display: flex; flex-direction: column; align-items: center; height: 100%; padding: 20px; width: 100%; }
+        .mw-card { margin-top: auto; margin-bottom: 20px; width: 90%; background: #fff; padding: 25px 20px; border-radius: 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); text-align: center; border: 1px solid #eee; }
+        
+        /* 详情页大图 */
+        .mw-food-hero { font-size: 100px; margin-top: 10vh; transition: clip-path 0.3s, opacity 0.3s; opacity: 1; }
+        
+        /* 详情页锯齿同步 (加大版) */
+        .mw-food-hero.bitten-light { clip-path: polygon(0% 0%, 60% 0%, 55% 25%, 80% 20%, 100% 40%, 100% 100%, 0% 100%); }
+        .mw-food-hero.bitten-heavy { clip-path: polygon(0% 60%, 20% 55%, 35% 70%, 50% 60%, 65% 80%, 80% 65%, 100% 90%, 100% 100%, 0% 100%); }
+        
+        /* 强制冒烟 */
+        .mw-food-hero.status-bad { filter: drop-shadow(0 0 15px rgba(85, 239, 196, 0.8)); }
+
+        /* 3D Slider */
+        .slider-container { width: 100%; margin: 20px 0; background: #fff5f7; padding: 15px; border-radius: 20px; border: 2px solid #ffe0e6; }
+        .slider-label { font-size: 14px; color: #888; display: flex; justify-content: space-between; margin-bottom: 15px; font-weight: bold; }
+        input[type=range] { 
+            -webkit-appearance: none; width: 100%; height: 12px; 
+            background: #e0e0e0; border-radius: 10px; outline: none;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+        }
+        input[type=range]::-webkit-slider-thumb { 
+            -webkit-appearance: none; appearance: none; 
+            width: 28px; height: 28px; border-radius: 50%; 
+            background: #ff9f43; border: 3px solid #fff;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.3); 
+            cursor: pointer; transition: transform 0.1s; 
+        }
+        input[type=range]::-webkit-slider-thumb:active { transform: scale(1.2); }
+
+    </style>
+</head>
+<body>
+
+    <div id="view-kitchen">
+        <div class="light-switch" onclick="toggleLights()">
+            <div class="switch-line"></div>
+            <div class="switch-img-box">
+                <img src="https://i.ibb.co/4ZKdZxP4/IMG-4262.jpg" alt="Switch">
+            </div>
+        </div>
+
+        <div class="bg-layer bg-on"></div>
+        <div class="bg-layer bg-off"></div>
+
+        <div class="click-zone zone-fridge" onclick="enterFridge()" data-name="打开冰箱 🧊"></div>
+        <div class="click-zone zone-sink" onclick="showToast('洗菜池：记得勤洗手哦 🧼')" data-name="洗手池 🧼"></div>
+        <div class="click-zone zone-snacks" onclick="showToast('零食柜：这里是快乐源泉 🍪')" data-name="零食柜 🍪"></div>
+    </div>
+
+    <div id="view-fridge-app">
+        <div class="kitchen-bg" onclick="closeFridge()"><div class="lamp"></div></div>
+
+        <div class="fridge-ears-container">
+            <div class="static-ear ear-left"></div>
+            <div class="static-ear ear-right"></div>
+        </div>
+
+        <div class="fridge-viewport" id="fridgeViewport">
+            <div class="door-overlay" onclick="openFridge()">
+                <div class="door-panel door-l">
+                    <div class="handle"></div>
+                    <span class="sticker" style="top: 80px; right: 20px; transform: rotate(15deg);">🍒</span>
+                    <span class="sticker" style="top: 200px; right: 30px; transform: rotate(-5deg);">📝</span>
+                </div>
+                <div class="door-panel door-r">
+                    <div class="handle"></div>
+                    <span class="sticker" style="top: 50px; left: 20px; transform: rotate(-10deg);">🐻</span>
+                </div>
+            </div>
+
+            <div class="camera-track" id="cameraTrack">
+                <div class="view-panel"><div class="panel-content"><div class="panel-title">左门收纳</div>
+                    <div class="door-shelf egg-shelf" id="door-l-egg" data-label="鸡蛋区"></div>
+                    <div class="door-shelf" id="door-l-mid" data-label="饮料/调料"></div>
+                    <div class="door-shelf" id="door-l-low" data-label="底部置物架"></div>
+                </div></div>
+
+                <div class="view-panel"><div class="fridge-main-bg"><div class="fridge-interior" onclick="closeAllDrawers()">
+                    <div class="shelf-area">
+                        <div class="shelf" id="shelf-top"><span class="shelf-label">顶部冷藏</span></div>
+                        <div class="shelf" id="shelf-mid"><span class="shelf-label">中部冷藏</span></div>
+                        <div class="shelf" id="shelf-low"><span class="shelf-label">蔬果保湿区</span></div>
+                    </div>
+                    <div class="mid-drawers">
+                        <div class="drawer-container" onclick="toggleDrawer(this, event)"><div class="drawer-face">小物</div><div class="drawer-body" id="drawer-small"></div></div>
+                        <div class="drawer-container" onclick="toggleDrawer(this, event)"><div class="drawer-face">速冷</div><div class="drawer-body" id="drawer-chill"></div></div>
+                    </div>
+                    <div class="drawer-container bottom-drawer" onclick="toggleDrawer(this, event)"><div class="drawer-face">冷冻室</div><div class="drawer-body" id="drawer-freeze"></div></div>
+                    <div class="drawer-container deep-drawer" onclick="toggleDrawer(this, event)"><div class="drawer-face">深冷冻</div><div class="drawer-body" id="drawer-deep"></div></div>
+                </div></div></div>
+
+                <div class="view-panel"><div class="panel-content"><div class="panel-title">右门收纳</div>
+                    <div class="door-shelf" id="door-r-top" data-label="顶部置物架"></div>
+                    <div class="door-shelf" id="door-r-mid" data-label="高瓶饮料区" style="height:35%;"></div>
+                    <div class="door-shelf" id="door-r-low" data-label="底部置物架"></div>
+                </div></div>
+            </div>
+
+            <button class="nav-arrow arrow-left" onclick="switchView('left')">←</button>
+            <button class="nav-arrow arrow-right" onclick="switchView('right')">→</button>
+            <button class="btn-back-center" onclick="switchView('center')">返回中间</button>
+        </div>
+
+        <div class="controls">
+            <div id="status-text">冰箱状态良好</div>
+            <div class="ctrl-right">
+                <button class="btn-close" id="btnClose" onclick="closeFridge()">关门</button>
+                <button class="btn-add" id="btnAdd" onclick="openAddModal()">+</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="layer-overlay">
+        <div class="spirit-container" id="spiritContainer">
+            <div class="spirit-ball-wrapper" id="spiritBallWrapper">
+                <div class="ball-inner" id="ballInner">
+                    <span id="spiritFace">^ ᴗ ^</span>
+                    <div class="msg-bubble" id="bubbleMsg">状态完美</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="btn-back-home" id="btnBack" onclick="exitFridge()" style="display:none; pointer-events:auto;">🏠 返回厨房</div>
+        
+        <div class="toast" id="sceneToast">这里暂时没有东西哦~</div>
+    </div>
+
+    <div id="micro-world">
+        <canvas id="mw-canvas"></canvas>
+        <div class="mw-content">
+            <div class="mw-food-hero" id="mw-emoji"></div>
+            <div class="mw-card">
+                <h2 id="mw-title" style="margin:5px 0;"></h2>
+                <p id="mw-text" style="color:#888; font-size:13px; margin-bottom:15px;"></p>
+                <div class="slider-container">
+                    <div class="slider-label"><span>吃掉了多少？</span><span id="eat-val-display" class="slider-val">100%</span></div>
+                    <input type="range" id="eat-slider" min="0" max="100" value="100" oninput="updateSliderVal(this.value)">
+                </div>
+                <div class="mw-actions">
+                    <button class="btn-main btn-cancel" onclick="closeMicroWorld()">取消</button>
+                    <button class="btn-main btn-toss" onclick="tossFood()">扔掉</button>
+                    <button class="btn-main btn-eat" onclick="confirmEat()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div id="view-form" class="modal-view">
+                <div class="modal-header">📝 放入新食物</div>
+                <div class="modal-body">
+                    <div class="icon-selector-row" onclick="showLibrary()">
+                        <div class="current-icon-preview" id="form-icon-preview">🍎</div>
+                        <div class="select-text">点击去图库选择图标</div>
+                        <div class="select-arrow">&gt;</div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">或者直接输入/粘贴 Emoji：</label>
+                        <input type="text" id="manual-input" class="input-box" value="🍎" oninput="syncManualInput(this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">名称 (选填)</label>
+                        <input type="text" id="input-name" class="input-box" placeholder="例如：红烧肉">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">保质期 (天)</label>
+                        <input type="number" id="input-days" class="input-box" value="5">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">放在哪？</label>
+                        <select id="input-loc" class="input-box">
+                            <optgroup label="冷藏-层板"><option value="shelf-top">顶部冷藏</option><option value="shelf-mid" selected>中部冷藏</option><option value="shelf-low">蔬果保湿区</option></optgroup>
+                            <optgroup label="冷藏-抽屉"><option value="drawer-small">小物收纳</option><option value="drawer-chill">速冷冰鲜</option></optgroup>
+                            <optgroup label="冷冻区"><option value="drawer-freeze">冷冻室大抽屉</option><option value="drawer-deep">深冷冻区(-30°C)</option></optgroup>
+                            <optgroup label="门板"><option value="door-r-mid">右门饮料区</option><option value="door-l-mid">左门调料区</option><option value="door-l-egg">鸡蛋区</option></optgroup>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-main btn-close" onclick="closeAddModal()">取消</button>
+                    <button class="btn-main btn-eat" onclick="confirmAdd()">放入冰箱</button>
+                </div>
+            </div>
+            <div id="view-library" class="modal-view">
+                <div class="lib-header-row"><button class="btn-back-lib" onclick="hideLibrary()">←</button><span style="font-weight:bold; color:#555;">选择图标</span></div>
+                <div class="emoji-tabs" id="emojiTabs"></div>
+                <div class="emoji-grid" id="emojiGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleLights() {
+            document.body.classList.toggle('lights-out');
+            if (document.body.classList.contains('lights-out')) {
+                showToast('晚安 🌙');
+            } else {
+                showToast('早上好 ☀️');
+            }
+        }
+
+        function enterFridge() {
+            document.body.classList.add('mode-fridge');
+            document.getElementById('btnBack').style.display = 'flex';
+            
+            setTranslate(window.innerWidth / 2 - 25, 60, spiritWrapper);
+            
+            setTimeout(() => {
+                if(!isFridgeOpen) openFridge();
+            }, 600);
+        }
+
+        function exitFridge() {
+            closeFridge(); 
+            setTimeout(() => {
+                document.body.classList.remove('mode-fridge');
+                document.getElementById('btnBack').style.display = 'none';
+            }, 400);
+        }
+
+        function showToast(text) {
+            const t = document.getElementById('sceneToast');
+            t.innerText = text;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2000);
+        }
+
+        let isFridgeOpen = false;
+        let isHappy = true;
+        const viewport = document.getElementById('fridgeViewport');
+        const track = document.getElementById('cameraTrack');
+        const btnClose = document.getElementById('btnClose');
+        const spiritWrapper = document.getElementById('spiritBallWrapper');
+        const ballInner = document.getElementById('ballInner');
+        const spiritFace = document.getElementById('spiritFace');
+        const bubbleMsg = document.getElementById('bubbleMsg');
+        
+        let dragItem = spiritWrapper;
+        let active = false;
+        let currentX; let currentY;
+        let initialX; let initialY;
+        let xOffset = window.innerWidth / 2 - 25; 
+        let yOffset = 60; 
+
+        setTranslate(xOffset, yOffset, dragItem);
+
+        document.addEventListener("touchstart", dragStart, {passive: false});
+        document.addEventListener("touchend", dragEnd, {passive: false});
+        document.addEventListener("touchmove", drag, {passive: false});
+        document.addEventListener("mousedown", dragStart);
+        document.addEventListener("mouseup", dragEnd);
+        document.addEventListener("mousemove", dragStart);
+
+        function dragStart(e) {
+            if (e.target !== dragItem && !dragItem.contains(e.target)) return;
+            if (e.type === "touchstart") { initialX = e.touches[0].clientX - xOffset; initialY = e.touches[0].clientY - yOffset; } 
+            else { initialX = e.clientX - xOffset; initialY = e.clientY - yOffset; }
+            active = true;
+            dragItem.classList.add('dragging');
+        }
+        function dragEnd(e) {
+            if (!active) return;
+            initialX = currentX; initialY = currentY; active = false;
+            dragItem.classList.remove('dragging');
+        }
+        function drag(e) {
+            if (active) {
+                e.preventDefault();
+                if (e.type === "touchmove") { currentX = e.touches[0].clientX - initialX; currentY = e.touches[0].clientY - initialY; } 
+                else { currentX = e.clientX - initialX; currentY = e.clientY - initialY; }
+                xOffset = currentX; yOffset = currentY;
+                setTranslate(currentX, currentY, dragItem);
+            }
+        }
+        function setTranslate(xPos, yPos, el) { el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`; }
+        ballInner.addEventListener('click', (e) => { pokeBall(e); });
+
+        const emojiCategories = { "常用": ["🍎","🥦","🥛","🥩","🍰","🥚","🍚"], "蔬果": ["🍎","🍌","🥬","🥦","🥕","🌽","🍅","🥔","🧅","🍓","🍇","🍑","🍒","🥑","🥒"], "肉蛋": ["🥩","🍗","🍖","🥓","🥚","🐟","🦐","🦀"], "饮品": ["🥤","🧃","🍺","🍷","🍵","☕","🧊","🥛"], "熟食": ["🍜","🍚","🥟","🍔","🍕","🍞","🥪","🍦","🍰","🍫","🍬","🥞","🍟"] };
+        let currentCategory = "常用";
+        const today = new Date();
+        let foods = [ 
+            { id: 1, emoji: '🥦', name: '西兰花', added: new Date(today - 864e5), limit: 5, loc: 'shelf-low', remaining: 100 }, 
+            { id: 2, emoji: '🥛', name: '牛奶', added: new Date(today - 1728e5), limit: 3, loc: 'door-r-mid', remaining: 40 }, 
+            { id: 3, emoji: '🐟', name: '臭鱼', added: new Date(today - 800e6), limit: 3, loc: 'drawer-freeze', remaining: 100 }, 
+            { id: 4, emoji: '🍰', name: '发霉蛋糕', added: new Date(today - 500e6), limit: 2, loc: 'shelf-mid', remaining: 80 },
+            { id: 7, emoji: '🥚', name: '鸡蛋', added: new Date(), limit: 10, loc: 'door-l-egg', remaining: 100 },
+            { id: 8, emoji: '🥚', name: '鸡蛋', added: new Date(), limit: 10, loc: 'door-l-egg', remaining: 100 },
+            { id: 9, emoji: '🥚', name: '鸡蛋', added: new Date(), limit: 10, loc: 'door-l-egg', remaining: 100 },
+            { id: 10, emoji: '🥚', name: '鸡蛋', added: new Date(), limit: 10, loc: 'door-l-egg', remaining: 100 }
+        ];
+
+        function pokeBall(e) { e.stopPropagation(); ballInner.classList.add('poked'); if (!isHappy) { showMessage("快处理坏食物..."); } else { showMessage("电力满满！"); } setTimeout(() => ballInner.classList.remove('poked'), 300); }
+        function showMessage(text) { bubbleMsg.innerText = text; bubbleMsg.classList.add('show'); setTimeout(() => bubbleMsg.classList.remove('show'), 2000); }
+        function checkStatus() { const badFoods = foods.filter(f => getRiskInfo(f).cls === 'bad'); if (badFoods.length > 0) { isHappy = false; ballInner.classList.add('sad'); spiritFace.innerText = 'T A T'; viewport.classList.add('crying-body'); document.getElementById('status-text').innerText = "检测到变质食物，请清理！"; } else { isHappy = true; ballInner.classList.remove('sad'); spiritFace.innerText = '^ ᴗ ^'; viewport.classList.remove('crying-body'); document.getElementById('status-text').innerText = "状态完美 ✨"; } }
+        function openFridge() { if(isFridgeOpen) return; isFridgeOpen = true; viewport.classList.add('is-open'); spiritWrapper.classList.add('hidden'); setTimeout(() => { viewport.classList.add('view-center'); btnClose.style.display = 'block'; }, 600); }
+        function closeFridge() { if(!isFridgeOpen) return; isFridgeOpen = false; switchView('center'); closeAllDrawers(); btnClose.style.display = 'none'; viewport.classList.remove('is-open'); viewport.classList.remove('view-center'); setTimeout(() => { spiritWrapper.classList.remove('hidden'); checkStatus(); }, 500); }
+        function switchView(target) { viewport.classList.remove('view-center', 'view-side'); if (target === 'left') { track.style.transform = 'translateX(0%)'; viewport.classList.add('view-side'); } else if (target === 'center') { track.style.transform = 'translateX(-33.333%)'; viewport.classList.add('view-center'); closeAllDrawers(); } else if (target === 'right') { track.style.transform = 'translateX(-66.666%)'; viewport.classList.add('view-side'); } }
+        function toggleDrawer(el, e) { e.stopPropagation(); const isOpen = el.classList.contains('is-pulled'); closeAllDrawers(); if(!isOpen) el.classList.add('is-pulled'); }
+        function closeAllDrawers() { document.querySelectorAll('.drawer-container').forEach(d => d.classList.remove('is-pulled')); }
+
+        function renderFridge() {
+            document.querySelectorAll('.shelf, .drawer-body, .door-shelf').forEach(el => { if(el.dataset.label) { while(el.firstChild) el.removeChild(el.firstChild); } else if(!el.classList.contains('shelf-area')) { el.innerHTML = ''; } });
+            foods.forEach(f => {
+                const info = getRiskInfo(f); const el = document.createElement('div'); el.className = `food-bubble status-${info.cls}`;
+                if (f.remaining < 100) { if (f.remaining < 50) el.classList.add('bitten-heavy'); else el.classList.add('bitten-light'); }
+                if (f.emoji.length > 2) { el.classList.add('text-mode'); }
+                const hoursIn = (new Date() - f.added) / (1000 * 60 * 60);
+                if ( (f.loc === 'drawer-freeze' || f.loc === 'drawer-deep') && hoursIn > 2 ) { el.classList.add('frozen'); }
+                el.innerHTML = f.emoji; el.onclick = (e) => { e.stopPropagation(); enterMicroWorld(e, f); };
+                const box = document.getElementById(f.loc); if(box) box.appendChild(el);
+            }); checkStatus();
+        }
+
+        function getRiskInfo(f) { const diffDays = (new Date() - f.added) / 864e5; const ratio = diffDays / f.limit; if(ratio <= 0.5) return { cls: 'fresh', label: '新鲜' }; if(ratio <= 1.0) return { cls: 'warn', label: '临期' }; return { cls: 'bad', label: '过期' }; }
+        function openAddModal(){ document.getElementById('addModal').style.display='flex'; hideLibrary(); }
+        function closeAddModal(){ document.getElementById('addModal').style.display='none'; }
+        function showLibrary() { document.getElementById('view-form').style.display = 'none'; document.getElementById('view-library').style.display = 'flex'; initEmojiPicker(); }
+        function hideLibrary() { document.getElementById('view-library').style.display = 'none'; document.getElementById('view-form').style.display = 'flex'; }
+        function initEmojiPicker() { const tabs = document.getElementById('emojiTabs'); let html = ""; for(let cat in emojiCategories) { html += `<div class="emoji-tab ${cat===currentCategory?'active':''}" onclick="switchCategory('${cat}')">${cat}</div>`; } tabs.innerHTML = html; renderEmojiGrid(); }
+        function switchCategory(cat) { currentCategory = cat; initEmojiPicker(); }
+        function renderEmojiGrid() { const grid = document.getElementById('emojiGrid'); grid.innerHTML = emojiCategories[currentCategory].map(e => `<div class="emoji-item" onclick="pickEmoji('${e}')">${e}</div>`).join(''); }
+        function pickEmoji(e) { document.getElementById('manual-input').value = e; syncManualInput(e); hideLibrary(); }
+        function syncManualInput(val) { document.getElementById('form-icon-preview').innerText = val; }
+        function confirmAdd(){ let emoji = document.getElementById('manual-input').value.trim(); const name = document.getElementById('input-name').value.trim(); const days = parseInt(document.getElementById('input-days').value) || 5; const loc = document.getElementById('input-loc').value; if (!emoji && name) { emoji = name.substring(0, 1); } else if (!emoji && !name) { emoji = '📦'; } foods.push({ id: Date.now(), emoji, name, added: new Date(), limit: days, loc, remaining: 100 }); renderFridge(); closeAddModal(); if(!isFridgeOpen) openFridge(); }
+
+        /* --- 核心修改：微观世界逻辑 (粒子区分 & 咬痕加大 & 消失逻辑) --- */
+        let currentFoodId = null;
+        const cvs=document.getElementById('mw-canvas'),ctx=cvs.getContext('2d'); let parts=[],animId; 
+        function resize(){cvs.width=window.innerWidth;cvs.height=window.innerHeight;} 
+
+        function enterMicroWorld(e, f) { 
+            currentFoodId = f.id; const mw = document.getElementById('micro-world'); const rect = e.target.getBoundingClientRect(); 
+            mw.style.transformOrigin = `${rect.left + rect.width / 2}px ${rect.top + rect.height / 2}px`; 
+            mw.style.display = 'flex'; mw.offsetWidth; mw.classList.add('active'); 
+            
+            const hero = document.getElementById('mw-emoji'); 
+            hero.innerHTML = f.emoji; 
+            hero.style.opacity = 1; 
+
+            document.getElementById('mw-title').innerText = f.name || "未命名食物"; 
+            document.getElementById('mw-text').innerText = getRiskInfo(f).label; 
+            
+            const slider = document.getElementById('eat-slider'); slider.value = f.remaining; 
+            updateSliderVal(f.remaining); 
+            
+            // 启动粒子动画 (传入状态)
+            startAnim(getRiskInfo(f).cls); 
+            
+            hero.className = 'mw-food-hero';
+            if(getRiskInfo(f).cls === 'bad') hero.classList.add('status-bad');
+        }
+
+        function updateSliderVal(val) { 
+            const hero = document.getElementById('mw-emoji'); 
+            document.getElementById('eat-val-display').innerText = val == 0 ? "吃光光" : `剩余 ${val}%`; 
+            
+            hero.className = 'mw-food-hero'; 
+            
+            // 吃光光 -> 消失
+            if(val == 0) {
+                hero.style.opacity = 0;
+            } else {
+                hero.style.opacity = 1;
+                // 咬痕逻辑 (加大版)
+                if(val < 50) hero.classList.add('bitten-heavy'); 
+                else if(val < 100) hero.classList.add('bitten-light');
+            }
+            
+            const food = foods.find(f => f.id === currentFoodId);
+            if(food && getRiskInfo(food).cls === 'bad') hero.classList.add('status-bad');
+        }
+        
+        function closeMicroWorld() { const mw = document.getElementById('micro-world'); mw.classList.remove('active'); setTimeout(()=>{ mw.style.display='none'; stopAnim(); }, 400); }
+        function tossFood() { foods = foods.filter(f => f.id !== currentFoodId); closeMicroWorld(); renderFridge(); showMessage("垃圾桶接住了！"); }
+        function confirmEat() { const val = document.getElementById('eat-slider').value; if (val == 0) { foods = foods.filter(f => f.id !== currentFoodId); showMessage("嗝~"); } else { const food = foods.find(f => f.id === currentFoodId); if(food) food.remaining = val; showMessage("已记录"); } closeMicroWorld(); renderFridge(); }
+
+        /* 粒子动画系统 (区分好坏) */
+        function startAnim(cls){ 
+            resize(); parts=[]; 
+            const isBad = (cls === 'bad' || cls === 'warn');
+            const count = isBad ? 50 : 40; 
+            
+            for(let i=0;i<count;i++){
+                parts.push({
+                    x:Math.random()*cvs.width,
+                    y:Math.random()*cvs.height,
+                    vx:(Math.random()-0.5)*(isBad?2:0.5), 
+                    vy:(Math.random()-0.5)*(isBad?2:0.5),
+                    size: Math.random()*20 + 5,
+                    type: isBad ? 'germ' : 'love', 
+                    // 颜色区分：好=粉黄蓝，坏=深紫墨绿
+                    color: isBad ? (Math.random()>0.5 ? '#6c5ce7' : '#2d3436') : (Math.random()>0.5 ? '#fab1a0' : '#ffeaa7')
+                }); 
+            } 
+            animate(); 
+        } 
+
+        function animate(){ 
+            ctx.clearRect(0,0,cvs.width,cvs.height); 
+            parts.forEach(p=>{ 
+                p.x+=p.vx; p.y+=p.vy; 
+                if(p.x < 0) p.x = cvs.width; if(p.x > cvs.width) p.x = 0;
+                if(p.y < 0) p.y = cvs.height; if(p.y > cvs.height) p.y = 0;
+
+                ctx.fillStyle = p.color; 
+                ctx.beginPath();
+                if(p.type === 'germ') {
+                    // 病毒形状 (刺刺的)
+                    for(let i=0; i<8; i++){
+                        ctx.lineTo(p.x + Math.cos(i)*p.size, p.y + Math.sin(i)*p.size);
+                    }
+                } else {
+                    // 爱心/圆圈 (治愈系)
+                    ctx.arc(p.x,p.y,p.size/2,0,Math.PI*2);
+                }
+                ctx.fill(); 
+            }); 
+            animId=requestAnimationFrame(animate); 
+        } 
+        function stopAnim(){cancelAnimationFrame(animId);}
+
+        renderFridge(); setTimeout(checkStatus, 500);
+    </script>
+</body>
+</html>
